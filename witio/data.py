@@ -15,7 +15,9 @@ from datetime import datetime
 
 import numpy as np
 
+from . import metadata as _metadata
 from . import transform, units
+from .metadata import TraceRecord
 from .tag import WitTag
 
 _DATATYPE_DTYPE = {
@@ -158,6 +160,31 @@ class WitData:
                 type=int(types[i]) if i < len(types) else None,
             ))
         return out
+
+    @property
+    def trace_record(self) -> TraceRecord | None:
+        """The Trace/ParamSets acquisition record that produced this Data entry
+        (matched via TData/GUID <-> Trace/*/Outputs/*/DataGuid), or None if this
+        project has no Trace subtree or this entry wasn't produced by a traced
+        acquisition (e.g. derived TD*Interpretation/TD*Transformation entries)."""
+        tdata = self.tdata
+        if tdata is None:
+            return None
+        guid_tag = tdata.find("GUID")
+        if guid_tag is None:
+            return None
+        return self.project.trace_lookup.get(_metadata.normalize_guid(guid_tag.scalar()))
+
+    @property
+    def measurement_metadata(self) -> dict:
+        """Structured measurement metadata for this Data entry (laser/objective/
+        spectrograph/camera/scan settings, sample position, ...), resolved from
+        this entry's Trace record. Only fields that were actually present and
+        recognized are included; see `trace_record.raw_params` for everything
+        else (including unrecognized ParamGuids). Returns {} if no Trace record
+        was found for this entry."""
+        record = self.trace_record
+        return record.to_metadata_dict() if record is not None else {}
 
     # -- Payload dispatch -----------------------------------------------------
     @property

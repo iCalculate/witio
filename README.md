@@ -25,6 +25,7 @@ project = witio.read("sample.wip")
 for entry in project.find(class_name="TDGraph"):
     spectra = entry.array()                       # (SizeX, SizeY, SizeGraph)
     raman_shift, unit = entry.x_axis("rel. 1/cm")  # calibrated axis, unit == 'rel. 1/cm'
+    print(entry.measurement_metadata)              # laser/objective/spectrograph/camera/scan settings
 ```
 
 ## Contents
@@ -97,6 +98,37 @@ print(entry.caption, entry.id, entry.history)
 
 A runnable version of this lives in [`examples/read_example.py`](examples/read_example.py).
 
+### Measurement metadata (WITec Suite v7/v8)
+
+WITec Suite v7/v8 projects record acquisition settings in a `Trace` subtree
+that's separate from each Data entry's own tag tree. `witio` resolves this
+automatically and exposes it as a structured dict per Data entry, plus
+project-level system info -- no need to walk `Trace`/`ParamSets` by hand:
+
+```python
+project = witio.read("sample.wip")
+
+print(project.system_metadata)
+# {'system_id': 'WS-2882', 'application_version': 'WITec Control 7.0.5.153 (Plus Version)',
+#  'service_id': '13368,13368,13368', 'license_id': '12218,12216,12219'}
+
+entry = project.find(class_name="TDGraph")[0]
+meta = entry.measurement_metadata
+print(meta["laser_wavelength_nm"], meta["integration_time_s"], meta["objective_name"])
+print(meta.get("scan_size_x_px"), meta.get("scan_span_x_um"))  # only present for area/line scans
+
+# Every {DataGuid: TraceRecord} entry, if you need to cross-reference by hand:
+project.trace_lookup
+```
+
+`measurement_metadata` resolves ~40 known fields (laser, objective, sample
+position, spectrograph, camera, and line/area scan geometry -- see
+[`witio/metadata.py`](witio/metadata.py) for the full list) plus bookkeeping
+fields (`trace_guid`, `trace_source_guid`, `trace_creation_time_utc`, ...).
+Unrecognized `ParamGuid`/`EnumValueGuid` values are never dropped -- they
+stay available via `entry.trace_record.raw_params`. Projects without a
+`Trace` subtree (older WITec software) simply get `{}` back.
+
 ## Supported data
 
 | WITec class | Extraction | Notes |
@@ -107,6 +139,8 @@ A runnable version of this lives in [`examples/read_example.py`](examples/read_e
 | `TDText` | `.text()` | Best-effort RTF → plaintext (legacy `TDStream` layout only). |
 | Any `TDGraph`/`TDImage`/`TDBitmap` | `.x_axis(unit)` / `.position_grid(unit)` | Resolves linked `TD*Transformation`/`TD*Interpretation` entries by ID and converts units. |
 | `TData` (all entries) | `.id`, `.caption`, `.history`, `.metadata` | |
+| Any Data entry (v7/v8) | `.measurement_metadata`, `.trace_record` | Resolved from the project's `Trace`/`ParamSets` subtree; see [Measurement metadata](#measurement-metadata-witec-suite-v7v8). |
+| Project (v7/v8) | `.system_metadata`, `.trace_lookup`, `.trace_records` | System ID/software version, and every `Trace` acquisition record keyed by `DataGuid`. |
 
 Spectral axis units: `nm`, `um`, `1/cm`, `rel. 1/cm` (Raman shift), `eV`, `meV`,
 `rel. eV`, `rel. meV`. Spatial units: `m`, `mm`, `um`, `nm`, `A`, `pm`.

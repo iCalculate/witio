@@ -14,11 +14,13 @@ the original MATLAB toolbox.
 """
 from .project import WitProject, read, read_bytes
 from .data import WitData, HistoryEntry, DataFormatError
+from .metadata import TraceRecord
 from .tag import WitTag, WitFormatError
 
 __version__ = "0.1.0"
 
 __all__ = [
     "read", "read_bytes", "WitProject", "WitData", "HistoryEntry",
-    "WitTag", "WitFormatError", "DataFormatError", "__version__",
+    "WitTag", "WitFormatError", "DataFormatError",
+    "TraceRecord", "__version__",
 ]

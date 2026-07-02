@@ -7,8 +7,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from . import metadata as _metadata
 from . import tag as _tag
 from .data import WitData
+from .metadata import TraceRecord
 from .tag import WitTag
 
 
@@ -22,6 +24,8 @@ class WitProject:
         self.file_path = file_path
         self._data: list[WitData] | None = None
         self._by_id: dict[int, WitData] | None = None
+        self._system_metadata: dict[str, str] | None = None
+        self._trace_lookup: dict[str, TraceRecord] | None = None
 
     @property
     def version(self) -> int | None:
@@ -64,6 +68,32 @@ class WitProject:
         if caption is not None:
             out = [d for d in out if d.caption == caption]
         return out
+
+    @property
+    def system_metadata(self) -> dict[str, str]:
+        """Project-level metadata from 'root/SystemInformation' (system_id,
+        application_version, service_id, license_id -- only fields present are returned)."""
+        if self._system_metadata is None:
+            self._system_metadata = _metadata.parse_system_metadata(self.root)
+        return self._system_metadata
+
+    def build_trace_metadata_lookup(self) -> dict[str, TraceRecord]:
+        """Parse 'root/Trace' and return {normalize_guid(DataGuid): TraceRecord},
+        associating each Data entry's TData/GUID with the acquisition metadata
+        (ParamSets) of the Trace record that produced it. Cached after first call."""
+        if self._trace_lookup is None:
+            self._trace_lookup = _metadata.build_trace_lookup(self.root)
+        return self._trace_lookup
+
+    @property
+    def trace_lookup(self) -> dict[str, TraceRecord]:
+        """{normalize_guid(DataGuid): TraceRecord} -- see `build_trace_metadata_lookup`."""
+        return self.build_trace_metadata_lookup()
+
+    @property
+    def trace_records(self) -> list[TraceRecord]:
+        """Every TraceRecord in this project, one per Trace output DataGuid."""
+        return list(self.trace_lookup.values())
 
     def __repr__(self):
         return f"<WitProject file={self.file_path!r} version={self.version} n_data={len(self.data)}>"

@@ -25,6 +25,16 @@ def main(path: str) -> None:
         arr = image.array()
         print(f"\n{image.caption}: image shape {arr.shape}")
 
+    print(f"\nsystem metadata: {project.system_metadata}")
+    for graph in project.find(class_name="TDGraph"):
+        meta = graph.measurement_metadata
+        if not meta:
+            continue
+        print(f"\n{graph.caption}:")
+        print(f"  laser={meta.get('laser_wavelength_nm')}nm  "
+              f"integration_time={meta.get('integration_time_s')}s  "
+              f"objective={meta.get('objective_name')!r}")
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
